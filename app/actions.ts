@@ -270,3 +270,40 @@ export async function reserveSlotAction(timeSlot: Slot, date: string, courtId: s
 }
 
 
+
+
+export async function fetchReservationsAction() {
+  if (!REGION || !API_HOSTNAME) return;
+
+  const path = "/prod/reservationFetch";
+
+
+  const request = new HttpRequest({
+    method: "GET",
+    protocol: "https:",
+    path,
+    hostname: API_HOSTNAME,
+    headers: {
+      host: API_HOSTNAME
+    },
+  })
+
+  const signedRequest = await signRequest(request);
+  if (!signedRequest) return;
+
+
+  // Convert the signed request to fetch-compatible format
+  const fetchConfig = {
+    method: signedRequest.method,
+    headers: signedRequest.headers,
+  };
+
+  const url = new URL(`https://${API_HOSTNAME}${path}`);
+
+  const a = await fetch(url, fetchConfig);
+  const b = await a.json() as object[];
+  // console.log(b);
+  return b;
+}
+
+
