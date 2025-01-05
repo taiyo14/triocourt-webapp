@@ -50,6 +50,30 @@ export type SignupMessage = {
   }
 }
 
+export const dateSchema = z.string().date();
+
+export const dateFormSchema = z.object({
+  date: dateSchema
+})
+
+export type DateForm = z.infer<typeof dateFormSchema>
+export type DateType = z.infer<typeof dateSchema>
+
+export function curDate() { return new Date().toISOString().split('T').at(0) as string };
+
+export type Slot = {
+  start: number,
+  end: number,
+  avail: "available" | "occupied" | "unavailable"
+}
+
+export type AvailabilityResponse = {
+  courtId: string,
+  date: DateType,
+  availability: Slot[]
+}
+
+
 
 //  ================== TOKENS ==================
 

@@ -183,3 +183,47 @@ export async function signoutAction() {
 
 
 
+
+export async function availabilityAction(date: DateForm) {
+
+  const validation = dateFormSchema.safeParse(date);
+  if (validation.error) return;
+  const safeDate = validation.data;
+
+  if (!REGION || !API_HOSTNAME) return;
+
+  const path = "/prod/availability";
+  const query = {
+    date: safeDate.date
+  }
+
+  const request = new HttpRequest({
+    method: "GET",
+    protocol: "https:",
+    path,
+    hostname: API_HOSTNAME,
+    headers: {
+      host: API_HOSTNAME
+    },
+    query
+  });
+
+  const signedRequest = await signRequest(request);
+  if (!signedRequest) return;
+
+  // Convert the signed request to fetch-compatible format
+  const fetchConfig = {
+    method: signedRequest.method,
+    headers: signedRequest.headers,
+  };
+
+  const url = new URL(`https://${API_HOSTNAME}${path}`);
+  const params = new URLSearchParams(query);
+  url.search = params.toString();
+
+  const a = await fetch(url, fetchConfig);
+  const b = await a.json() as AvailabilityResponse;
+  // console.log(b);
+  return b;
+}
+

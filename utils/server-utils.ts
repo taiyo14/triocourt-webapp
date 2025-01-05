@@ -183,6 +183,32 @@ export async function deleteAllCookies() {
 
 
 
+export async function signRequest(request: HttpRequest) {
+
+  const session = await getAllTokens();
+
+  if (!session || !REGION || !AUTH_SECRET) return null;
+
+  const awsCreds = {
+    accessKeyId: session.aws_creds.AccessKeyId ?? "",
+    secretAccessKey: session.aws_creds.SecretAccessKey ?? "",
+    sessionToken: session.aws_creds.SessionToken ?? "",
+    expiration: session.aws_creds.Expiration ?? "",
+  }
+
+  // console.log(`secret used to sign request: ${JSON.stringify(session.aws_creds.SecretAccessKey)}`)
+  const smithy = new SignatureV4({
+    region: REGION,
+    credentials: awsCreds,
+    service: "execute-api",
+    sha256: Sha256,
+  })
+
+  const signedRequest = await smithy.sign(request);
+  return signedRequest;
+}
+
+
 
 export async function makeSecretHash(email: string) {
   try {
