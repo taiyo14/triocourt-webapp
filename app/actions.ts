@@ -307,3 +307,40 @@ export async function fetchReservationsAction() {
 }
 
 
+
+export async function deleteReservationAction(id: string) {
+  if (!REGION || !API_HOSTNAME) return;
+
+  const path = "/prod/reservationDelete";
+  const body = JSON.stringify({
+    reservationId: id
+  });
+
+  const request = new HttpRequest({
+    method: "POST",
+    protocol: "https:",
+    path,
+    hostname: API_HOSTNAME,
+    headers: {
+      host: API_HOSTNAME
+    },
+    body,
+  })
+
+  const signedRequest = await signRequest(request);
+  if (!signedRequest) return;
+
+
+  // Convert the signed request to fetch-compatible format
+  const fetchConfig = {
+    method: signedRequest.method,
+    headers: signedRequest.headers,
+    body: signedRequest.body
+  };
+
+  const url = new URL(`https://${API_HOSTNAME}${path}`);
+
+  const a = await fetch(url, fetchConfig);
+  const b = await a.text();
+  return b;
+}
