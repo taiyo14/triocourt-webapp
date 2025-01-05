@@ -245,6 +245,35 @@ export function parseJwt(token: string) {
 }
 
 
+export async function refreshCognitoToken(idToken: string, refreshToken: string) {
+  try {
+
+    const sub = parseJwt(idToken).sub;
+    if (!sub) throw new Error("Missing Sub");
+
+    const secretHash = await makeSecretHash(sub);
+    if (!secretHash) throw new Error("Failed to make secret hash");
+
+    const input: InitiateAuthCommandInput = {
+      AuthFlow: "REFRESH_TOKEN_AUTH",
+      ClientId: COGNITO_APPCLIENT_ID,
+      AuthParameters: {
+        REFRESH_TOKEN: refreshToken,
+        SECRET_HASH: secretHash,
+      }
+    }
+    const initiateAuthCommand = new InitiateAuthCommand(input);
+    const initiateAuthRes = await cognitoclient.send(initiateAuthCommand);
+
+    const { AuthenticationResult } = initiateAuthRes;
+    if (!AuthenticationResult) throw new Error("AuthenticationResult is undefined");
+    return AuthenticationResult;
+
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+}
 
 
 
