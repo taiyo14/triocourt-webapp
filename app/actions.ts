@@ -227,3 +227,46 @@ export async function availabilityAction(date: DateForm) {
   return b;
 }
 
+
+
+
+export async function reserveSlotAction(timeSlot: Slot, date: string, courtId: string) {
+  if (!REGION || !API_HOSTNAME) return;
+
+  const path = "/prod/reservation";
+  const body = JSON.stringify({
+    timeSlot,
+    date,
+    courtId
+  });
+
+  const request = new HttpRequest({
+    method: "POST",
+    protocol: "https:",
+    path,
+    hostname: API_HOSTNAME,
+    headers: {
+      host: API_HOSTNAME
+    },
+    body,
+  })
+
+  const signedRequest = await signRequest(request);
+  if (!signedRequest) return;
+
+
+  // Convert the signed request to fetch-compatible format
+  const fetchConfig = {
+    method: signedRequest.method,
+    headers: signedRequest.headers,
+    body: signedRequest.body
+  };
+
+  const url = new URL(`https://${API_HOSTNAME}${path}`);
+
+  const a = await fetch(url, fetchConfig);
+  const b = await a.json();
+  return b;
+}
+
+
