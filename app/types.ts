@@ -1,4 +1,55 @@
 import { z } from "zod";
+import isStrongPassword from "validator/es/lib/isStrongPassword";
+
+const base = {
+  minLength: 0,
+  minLowercase: 0,
+  minUppercase: 0,
+  minNumbers: 0,
+  minSymbols: 0,
+}
+
+export const tooSmallMessage = "Must be 8 or more characters";
+
+export const minLengthSchema = z.string().refine(str => isStrongPassword(str, { ...base, minLength: 8 }));
+
+export const strongPassword = z.string().superRefine((str, ctx) => {
+  if (!minLengthSchema.safeParse(str).success) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: tooSmallMessage,
+    })
+  }
+})
+
+export const signupFormSchema = z.object({
+  email: z.string().email(),
+  password: strongPassword
+})
+
+export type SignupForm = z.infer<typeof signupFormSchema>
+
+
+
+export const signinFormSchema = z.object({
+  email: z.string().email(),
+  password: z.string()
+})
+
+export type SigninForm = z.infer<typeof signinFormSchema>
+
+export type SignupMessage = {
+  error?: {
+    code: number;
+    message: string;
+    email: undefined | string;
+  },
+  success?: {
+    UserConfirmed: boolean | undefined,
+    email: string,
+  }
+}
+
 
 //  ================== TOKENS ==================
 

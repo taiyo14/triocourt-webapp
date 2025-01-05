@@ -31,6 +31,13 @@ const cognitoclient = new CognitoIdentityProviderClient({ region: REGION });
 const identityclient = new CognitoIdentityClient({ region: REGION });
 
 
+export function getCurrentDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are zero-indexed
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 
 //  ================== METHODS ==================
@@ -175,3 +182,134 @@ export async function deleteAllCookies() {
 
 
 
+
+
+export async function makeSecretHash(email: string) {
+  try {
+    if (!COGNITO_APPCLIENT_SECRET) throw new Error('APPCLIENT_SECRET is undefined');
+    if (!COGNITO_APPCLIENT_ID) throw new Error('USERPOOL_ID is undefined');
+
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(COGNITO_APPCLIENT_SECRET),
+      { name: "HMAC", hash: { name: "SHA-256" } },
+      false,
+      ["sign"]
+    );
+
+    const message = encoder.encode(`${email}${COGNITO_APPCLIENT_ID}`);
+
+    const signature = await crypto.subtle.sign("HMAC", key, message);
+
+    // const base64Hash = btoa(String.fromCharCode(...new Uint8Array(signature)));
+    const base64Hash = Buffer.from(new Uint8Array(signature)).toString('base64');
+
+    return base64Hash;
+
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+}
+
+
+export function parseJwt(token: string) {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+}
+
+
+
+
+
+export async function fetchTokens(email: string, password: string) {
+  try {
+    const secretHash = await makeSecretHash(email);
+    if (!secretHash) throw new Error("Failed to make secret hash");
+
+    const input: InitiateAuthCommandInput = {
+      AuthFlow: "USER_PASSWORD_AUTH", // required
+      ClientId: COGNITO_APPCLIENT_ID, // required
+      AuthParameters: {
+        USERNAME: email,
+        PASSWORD: password,
+        SECRET_HASH: secretHash,
+      },
+    };
+
+    const initiateAuthCommand = new InitiateAuthCommand(input);
+    const initiateAuthRes = await cognitoclient.send(initiateAuthCommand);
+
+    const { AuthenticationResult } = initiateAuthRes;
+    if (!AuthenticationResult) throw new Error("AuthenticationResult is undefined");
+    return AuthenticationResult;
+
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+}
+
+export async function fetchAwsCredentials(IdToken: string, identityId?: string) {
+  /**
+   *  use idToken and userIdentiyId  to get temporary aws credentials  (expires in 1 hour)
+   */
+  try {
+
+    let userIdentityPoolId = identityId;
+
+    if (!userIdentityPoolId) {
+      const getIdRes = await fetchIdentityId(IdToken);
+      if (!getIdRes) throw new Error('Failed to fetch identity id');
+
+      userIdentityPoolId = getIdRes.IdentityId;
+    }
+    if (!userIdentityPoolId) throw new Error("Failed to get user's idenity pool id");
+
+    if (!COGNITO_POOL_ID) throw new Error("USERPOOL_ID is undefined");
+    if (!REGION) throw new Error("REGION is undefined");
+
+
+    const providerName = `cognito-idp.${REGION}.amazonaws.com/${COGNITO_POOL_ID}`
+    const getIdentityCreds = new GetCredentialsForIdentityCommand({
+      IdentityId: userIdentityPoolId,
+      Logins: {
+        [providerName]: IdToken
+      }
+    });
+
+    const getIdCredsRes = await identityclient.send(getIdentityCreds);
+    return getIdCredsRes;
+
+  } catch (error) {
+    console.error("Error fetching temporary aws creds from identity pool", error);
+    return null;
+  }
+}
+
+export async function fetchIdentityId(idToken: string) {
+  try {
+    if (!COGNITO_POOL_ID) throw new Error("USERPOOL_ID is undefined");
+    if (!REGION) throw new Error("REGION is undefined");
+    if (!IDENTITYPOOL_ID) throw new Error("IDENTITYPOOL_ID is undefined");
+    if (!AWS_ACCOUNT_ID) throw new Error("AWS_ACCOUNT_ID is undefined");
+
+
+    const providerName = `cognito-idp.${REGION}.amazonaws.com/${COGNITO_POOL_ID}`
+
+    const getIdCommand = new GetIdCommand({
+      AccountId: AWS_ACCOUNT_ID,
+      IdentityPoolId: IDENTITYPOOL_ID,
+      Logins: {
+        [providerName]: idToken
+      }
+    })
+
+    const getIdRes = await identityclient.send(getIdCommand);
+    return getIdRes;
+
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+}
